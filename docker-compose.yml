@@ -1,0 +1,72 @@
+version: '3'
+
+services:
+  nginx:
+    container_name: ${DOCKER_CONTAINER_NAME_NGINX:-nginx}
+    build: docker-images/nginx
+    command: nginx -g "daemon off;"
+    links:
+      - php
+    ports:
+      - "${DOCKER_EXPOSE_PORT_NGINX:-80}:80"
+    networks:
+      - main-network
+  php:
+    container_name: ${DOCKER_CONTAINER_NAME_PHP:-php}
+    build: docker-images/php
+    volumes:
+      - ./:/var/www
+    working_dir: /var/www
+    command: php-fpm
+    links:
+      - mysql
+      - cache
+    environment:
+      XDEBUG_CONFIG: "remote_host=${DOCKER_GATEWAY}"
+    user: "${DOCKER_UID}:${DOCKER_GID}"
+    networks:
+      - main-network
+  mysql:
+    container_name: ${DOCKER_CONTAINER_NAME_MYSQL:-mysql}
+    image: mariadb
+    ports:
+      - "${DOCKER_EXPOSE_PORT_MYSQL:-3306}:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      # TODO. Uncomment if import is necessary. Format: <sql_dump>:<static_docker_import_path>.
+      # - ${DB_DUMP_PATH}:/docker-entrypoint-initdb.d/dump.sql 
+      - mysql-volume:/var/lib/mysql
+    networks:
+      - main-network
+  cache:
+    container_name: ${DOCKER_CONTAINER_NAME_CACHE:-cache}
+    image: memcached
+    networks:
+      - main-network
+  redis:
+    container_name: ${DOCKER_CONTAINER_NAME_REDIS:-redis}
+    image: redis
+    hostname: redis
+    restart: always
+    ports:
+      - ${DOCKER_EXPOSE_PORT_REDIS:-6379}:6379
+    volumes:
+      - redis-volume:/data
+    networks:
+      - main-network
+
+networks:
+  main-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: ${DOCKER_SUBNET}
+
+volumes:
+  mysql-volume:
+  redis-volume:
